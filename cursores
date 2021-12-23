@@ -1,0 +1,109 @@
+-- Unidad N° 03: Programación PL/SQL
+-- Taller Disparadores (Triggers)
+
+-- Ejercicio 01: Crear una Tabla de auditoria para cambios no autorizados en 
+-- una tabla del sistema.
+
+-- Borrar las tablas si ya existen. Si es la primera vez que ejecutamos
+-- este script, no borrarlas (ya que no existen).
+
+drop table superheroes;
+drop table sh_audit_tbl;
+
+-- Tabla del sistema que queremos auditar sus cambios.
+create table superheroes 
+(sh_nombre varchar2(30)
+); 
+
+-- Insertamos registros en la tabla
+insert into superheroes values ('Aquaman');
+insert into superheroes values ('Hulk');
+insert into superheroes values ('Superman');
+
+-- Creamos la tabla de auditoría SH_AUDIT_TBL
+
+create table sh_audit_tbl 
+(newname varchar2(30),  
+oldname varchar2(30),
+user_name varchar2(30),
+date_audit date,
+operation   varchar2(40)); 
+
+-- Creamos un disparador (trigger) que se disparará (ejecutará) cuando
+-- se realize  un UPDATE del campo SH_NOMBRE de la tabla SUPERHEROES
+
+create or replace trigger SH_UPD_AUDIT 
+after update of sh_nombre 
+on superheroes 
+referencing new as n old as o 
+for each row 
+begin 
+  if :o.sh_nombre != :n.sh_nombre then 
+    insert into sh_audit_tbl 
+    values(:n.sh_nombre, :o.sh_nombre, sys_context('userenv','os_user'),sysdate, 'ACTUALIZACION') ;
+  end if; 
+end;
+
+-- Ver el contenido de nuestras tablas
+select * from superheroes;
+select * from sh_audit_tbl;
+
+-- Probando el trigger mediante UPDATE a la tabla SUPERHEROES
+
+
+update superheroes set sh_nombre='Hulk-02' where sh_nombre='Hulk';
+update superheroes set sh_nombre='Superman-02' where sh_nombre='Superman';
+
+
+-- Ejercicio 02:
+-- Crear un trigger que permita auditar los movimiento realizado a la tabla
+-- promedios finales
+
+
+-- Crear la tabla de PROMEDIOS
+CREATE TABLE PROMEDIOS (
+RUT NUMBER(8),
+PROMEDIO NUMBER (2,1)
+);
+
+-- Crear la tabla de auditoría
+CREATE TABLE MODIF_PROMEDIO_LOG ( log_date DATE
+                             , action VARCHAR2(50));
+                             
+-- Crear el trigger de auditoría                            
+CREATE OR REPLACE TRIGGER CAMBIOS_PROMEDIOS_TRIGGER
+  AFTER INSERT OR UPDATE OR DELETE
+  ON PROMEDIOS
+DECLARE
+  log_action  MODIF_PROMEDIO_LOG.action%TYPE;
+BEGIN
+  IF INSERTING THEN
+    log_action := 'Insert';
+  ELSIF UPDATING THEN
+    log_action := 'Update';
+  ELSIF DELETING THEN
+    log_action := 'Delete';
+  ELSE
+    DBMS_OUTPUT.PUT_LINE('This code is not reachable.');
+  END IF;
+
+  INSERT INTO MODIF_PROMEDIO_LOG (log_date, action)
+    VALUES (SYSDATE, log_action);
+END;
+
+-- Probemos ahora la funcionalidad de nuestro TRIGGER
+
+-- Insertar registros en la tabla PROMEDIOS
+insert into PROMEDIOS values (100,3.2);
+insert into PROMEDIOS values (200,6.4);
+insert into PROMEDIOS values (300,5.1);
+
+-- Borrar registros en la tabla PROMEDIOS
+delete PROMEDIOS where rut=200;
+
+-- Actualizar registros en la tabla PROMEDIOS
+update PROMEDIOS set promedio=4.2 where rut=100;
+
+-- Revisar las tablas para verificar los cambios
+select * from PROMEDIOS;
+select * from MODIF_PROMEDIO_LOG;
